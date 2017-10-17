@@ -124,6 +124,8 @@ typedef struct SegmentContext {
     SegmentListEntry cur_entry;
     SegmentListEntry *segment_list_entries;
     SegmentListEntry *segment_list_entries_end;
+
+    int segment_copyts;    //SECURO
 } SegmentContext;
 
 static void print_csv_escaped_str(AVIOContext *ctx, const char *str)
@@ -220,6 +222,12 @@ static int set_segment_filename(AVFormatContext *s)
     snprintf(seg->cur_entry.filename, size, "%s%s",
              seg->entry_prefix ? seg->entry_prefix : "",
              av_basename(oc->filename));
+
+    //SECURO
+    // Write segment data to temp file, so we don't accidentally grab a partial segment.
+    if(!seg->list)
+      av_strlcatf(oc->filename, sizeof(oc->filename), ".tmp");
+    //SECURO
 
     return 0;
 }
@@ -431,6 +439,18 @@ static int segment_end(AVFormatContext *s, int write_trailer, int is_last)
 
 end:
     ff_format_io_close(oc, &oc->pb);
+
+    // SECURO
+
+    // Now rename the temporary file (remove the .tmp).
+    if (!seg->list) {
+        char* final_filename = av_strdup(oc->filename);
+        final_filename[strlen(final_filename)-4] = '\0';
+        rename(oc->filename, final_filename);
+        av_free(final_filename);
+    }
+
+    // SECURO
 
     return ret;
 }
@@ -653,6 +673,11 @@ static int seg_init(AVFormatContext *s)
         seg->write_header_trailer = 1;
         seg->individual_header_trailer = 0;
     }
+
+    //SECURO
+    if (seg->segment_copyts)
+        seg->segment_count = seg->segment_idx;
+    //SECURO
 
     if (seg->initial_offset > 0) {
         av_log(s, AV_LOG_WARNING, "NOTE: the option initial_offset is deprecated,"
@@ -1045,6 +1070,7 @@ static const AVOption options[] = {
     { "segment_wrap",      "set number after which the index wraps",     OFFSET(segment_idx_wrap), AV_OPT_TYPE_INT, {.i64 = 0}, 0, INT_MAX, E },
     { "segment_list_entry_prefix", "set base url prefix for segments", OFFSET(entry_prefix), AV_OPT_TYPE_STRING,  {.str = NULL}, 0, 0, E },
     { "segment_start_number", "set the sequence number of the first segment", OFFSET(segment_idx), AV_OPT_TYPE_INT, {.i64 = 0}, 0, INT_MAX, E },
+    { "segment_copyts",    "adjust timestamps for -copyts setting",      OFFSET(segment_copyts), AV_OPT_TYPE_BOOL,   {.i64 = 0}, 0, 1,       E }, //SECURO
     { "segment_wrap_number", "set the number of wrap before the first segment", OFFSET(segment_idx_wrap_nb), AV_OPT_TYPE_INT, {.i64 = 0}, 0, INT_MAX, E },
     { "strftime",          "set filename expansion with strftime at segment creation", OFFSET(use_strftime), AV_OPT_TYPE_BOOL, {.i64 = 0 }, 0, 1, E },
     { "increment_tc", "increment timecode between each segment", OFFSET(increment_tc), AV_OPT_TYPE_BOOL, {.i64 = 0 }, 0, 1, E },

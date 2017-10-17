@@ -206,6 +206,9 @@ typedef struct HLSContext {
     int strict_std_compliance;
     char *allowed_extensions;
     int max_reload;
+
+    int live_start_segment; //SECURO
+
 } HLSContext;
 
 static int read_chomp_line(AVIOContext *s, char *buf, int maxlen)
@@ -1483,6 +1486,15 @@ static int select_cur_seq_no(HLSContext *c, struct playlist *pls)
              * require us to download a segment to inspect its timestamps. */
             return c->cur_seq_no;
 
+        //SECURO
+        /* If this is a live stream and we have the segment number to play from, use that */
+        if (c->live_start_segment > -1) {
+            //Be safe out there kids! (dont go outside the size it currently is)
+            c->live_start_segment = FFMAX(pls->start_seq_no, c->live_start_segment);
+            return FFMIN(pls->n_segments, c->live_start_segment);
+        }
+        //SECURO
+
         /* If this is a live stream, start live_start_index segments from the
          * start or end */
         if (c->live_start_index < 0)
@@ -2157,6 +2169,11 @@ static const AVOption hls_options[] = {
         INT_MIN, INT_MAX, FLAGS},
     {"max_reload", "Maximum number of times a insufficient list is attempted to be reloaded",
         OFFSET(max_reload), AV_OPT_TYPE_INT, {.i64 = 1000}, 0, INT_MAX, FLAGS},
+
+        //SECURO
+    {"live_start_segment", "segment number in the playlist to start the live stream at",
+        OFFSET(live_start_segment), AV_OPT_TYPE_INT, {.i64 = -1}, INT_MIN, INT_MAX, FLAGS},
+
     {NULL}
 };
 

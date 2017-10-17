@@ -109,6 +109,10 @@
 
 #include "libavutil/avassert.h"
 
+//SECURO
+#include "securo.h"
+//SECURO
+
 const char program_name[] = "ffmpeg";
 const int program_birth_year = 2000;
 
@@ -1660,6 +1664,8 @@ static void print_report(int is_last_report, int64_t timer_start, int64_t cur_ti
     int hours, mins, secs, us;
     int ret;
     float t;
+    //SECURO
+    float s_fps = 0;
 
     if (!print_stats && !is_last_report && !progress_avio)
         return;
@@ -1703,6 +1709,9 @@ static void print_report(int is_last_report, int64_t timer_start, int64_t cur_ti
 
             frame_number = ost->frame_number;
             fps = t > 1 ? frame_number / t : 0;
+            //SECURO
+            s_fps = fps;
+            //SECURO
             snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf), "frame=%5d fps=%3.*f q=%3.1f ",
                      frame_number, fps < 9.95, fps, q);
             av_bprintf(&buf_script, "frame=%d\n", frame_number);
@@ -1833,6 +1842,35 @@ static void print_report(int is_last_report, int64_t timer_start, int64_t cur_ti
 
     if (is_last_report)
         print_final_stats(total_size);
+
+
+    if(securoContext.progress_url && pts != AV_NOPTS_VALUE) {
+        char* reply;
+        char url[4096];
+
+        snprintf(url, sizeof(url),
+            "%s?speed=%.1f&fps=%.1f",
+            securoContext.progress_url, (float)speed, s_fps);
+
+
+        //av_log(NULL, AV_LOG_INFO, "about to put: %s\n", url);
+        reply = SEC_IssueHttpRequest(url, "PUT");
+
+        // Handle throttling.
+        if (strstr(reply, "canThrottle")) {
+            if (securoContext.throttle_delay == 0)
+                av_log(NULL, AV_LOG_INFO, "Throttle - Going into sloth mode.");
+
+            securoContext.throttle_delay = 500;
+        } else {
+            if (securoContext.throttle_delay == 500)
+                av_log(NULL, AV_LOG_INFO, "Throttle - Getting back to work.");
+
+            securoContext.throttle_delay = 0;
+        }
+
+        av_free(reply);
+    }
 }
 
 static void flush_encoders(void)
@@ -2762,6 +2800,10 @@ static int process_input_packet(InputStream *ist, const AVPacket *pkt, int no_eo
 
         do_streamcopy(ist, ost, pkt);
     }
+
+   if(securoContext.throttle_delay > 0){
+	usleep(1000*securoContext.throttle_delay);
+   }
 
     return !eof_reached;
 }

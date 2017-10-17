@@ -41,6 +41,8 @@
 #include "libavutil/pixdesc.h"
 #include "libavutil/pixfmt.h"
 
+#include "securo.h"
+
 #define DEFAULT_PASS_LOGFILENAME_PREFIX "ffmpeg2pass"
 
 #define MATCH_PER_STREAM_OPT(name, type, outvar, fmtctx, st)\
@@ -3751,6 +3753,10 @@ const OptionDef options[] = {
         "initialise hardware device", "args" },
     { "filter_hw_device", HAS_ARG | OPT_EXPERT, { .func_arg = opt_filter_hw_device },
         "set hardware device used when filtering", "device" },
+
+    //SECURO
+    { "progressurl", HAS_ARG | OPT_EXPERT, { .func_arg = securo_opt_progress_url }, "write progress information via HTTP PUT", "url" },
+    //SECURO
 
     { NULL, },
 };
