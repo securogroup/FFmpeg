@@ -1491,7 +1491,7 @@ static int select_cur_seq_no(HLSContext *c, struct playlist *pls)
         if (c->live_start_segment > -1) {
             //Be safe out there kids! (dont go outside the size it currently is)
             c->live_start_segment = FFMAX(pls->start_seq_no, c->live_start_segment);
-            return FFMIN(pls->n_segments, c->live_start_segment);
+            return FFMIN(pls->start_seq_no+pls->n_segments, c->live_start_segment);
         }
         //SECURO
 
